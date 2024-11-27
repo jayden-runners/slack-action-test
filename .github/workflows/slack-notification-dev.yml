@@ -22,17 +22,43 @@ jobs:
           PR_NUMBER=${{ github.event.number }}
           PR_TITLE="${{ github.event.pull_request.title }}"
           PR_URL=${{ github.event.pull_request.html_url }}
-          PR_MENTIONED_USERS=$(echo "${{ github.event.pull_request.requested_reviewers[*].login }}" | tr '\n' ', ')
+          PR_BODY="${{ github.event.pull_request.body }}"
+          
+          # 리뷰어 추출
+          REVIEWERS=""
+          for reviewer in $(echo '${{ toJSON(github.event.pull_request.requested_reviewers) }}' | jq -r '.[].login'); do
+            if [ -z "$REVIEWERS" ]; then
+              REVIEWERS="<@$reviewer>"
+            else
+              REVIEWERS="$REVIEWERS <@$reviewer>"
+            fi
+          done
 
-          # Handle empty PR_MENTIONED_USERS case
-          if [ -z "$PR_MENTIONED_USERS" ]; then
-            PR_MENTIONED_USERS="없음"
+          # PR 본문에서 @멘션 추출
+          MENTIONED_USERS=$(echo "$PR_BODY" | grep -o '@[[:alnum:]-]*' | tr '\n' ' ' | sed 's/@/<@/g')
+          
+          # 최종 멘션 문자열 생성
+          FINAL_MENTIONS=""
+          if [ ! -z "$REVIEWERS" ]; then
+            FINAL_MENTIONS="리뷰어: $REVIEWERS"
+          fi
+          if [ ! -z "$MENTIONED_USERS" ]; then
+            if [ ! -z "$FINAL_MENTIONS" ]; then
+              FINAL_MENTIONS="$FINAL_MENTIONS\n멘션: $MENTIONED_USERS"
+            else
+              FINAL_MENTIONS="멘션: $MENTIONED_USERS"
+            fi
+          fi
+          
+          # 아무도 멘션되지 않은 경우
+          if [ -z "$FINAL_MENTIONS" ]; then
+            FINAL_MENTIONS="없음"
           fi
 
           echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
           echo "PR_TITLE=$PR_TITLE" >> $GITHUB_ENV
           echo "PR_URL=$PR_URL" >> $GITHUB_ENV
-          echo "PR_MENTIONED_USERS=$PR_MENTIONED_USERS" >> $GITHUB_ENV
+          echo "PR_MENTIONED_USERS=$FINAL_MENTIONS" >> $GITHUB_ENV
 
       - name: Send Slack Notification
         uses: slackapi/slack-github-action@v1.26.0
