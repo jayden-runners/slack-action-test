@@ -1,0 +1,78 @@
+name: Slack Notification for dev branch push
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  send-slack-notification:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set push information
+        id: set_push_info
+        run: |
+          echo "PUSH_AUTHOR=${{ github.actor }}" >> $GITHUB_ENV
+          echo "PR_URL=https://github.com/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.sha }}" >> $GITHUB_ENV
+          
+          # 커밋 메시지에서 첫 번째 줄만 추출
+          FIRST_LINE=$(echo "${{ github.event.head_commit.message }}" | head -n 1)
+          
+          # PR 머지인 경우 PR 제목을, 일반 푸시인 경우 커밋 메시지를 가져옴
+          if [[ "${FIRST_LINE}" == "Merge pull request"* ]]; then
+            PR_TITLE=$(echo "${FIRST_LINE}" | grep -oP '(?<=Merge pull request #\d+ from \S+\s).*')
+            echo "COMMIT_MSG=${PR_TITLE}" >> $GITHUB_ENV
+          else
+            echo "COMMIT_MSG=${FIRST_LINE}" >> $GITHUB_ENV
+          fi
+
+      - name: Send Slack Notification
+        uses: slackapi/slack-github-action@v1.26.0
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        with:
+          channel-id: ${{ secrets.SLACK_DEPLOY_CHANNEL_ID }}
+          payload: |
+            {
+              "text": "🔄 dev 브랜치가 업데이트 되었습니다",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "🔄 dev 브랜치 업데이트 알림",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*담당자:* 👩‍💻 ${{ env.PUSH_AUTHOR }}\n*커밋 메시지:* ${{ env.COMMIT_MSG }}\n\n dev 브랜치가 업데이트 되었습니다. 작업 전 반드시 merge/pull 해주세요!"
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "emoji": true,
+                        "text": "🔍 변경사항 보기"
+                      },
+                      "style": "primary",
+                      "url": "${{ env.PR_URL }}",
+                      "value": "view_pr"
+                    }
+                  ]
+                },
+                {
+                  "type": "divider"
+                }
+              ]
+            }
