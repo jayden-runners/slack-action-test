@@ -68,7 +68,7 @@ jobs:
                         "text": "🔍 변경사항 보기"
                       },
                       "style": "primary",
-                      "url": "${{ env.CHANGE_URL }}"
+                      "url": "${{ env.CHANGE_URL }}",
                       "value": "view_pr"
                     }
                   ]
