@@ -19,12 +19,15 @@ jobs:
           echo "PUSH_AUTHOR=${{ github.actor }}" >> $GITHUB_ENV
           echo "PR_URL=https://github.com/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.sha }}" >> $GITHUB_ENV
           
+          # 커밋 메시지에서 첫 번째 줄만 추출
+          FIRST_LINE=$(echo "${{ github.event.head_commit.message }}" | head -n 1)
+          
           # PR 머지인 경우 PR 제목을, 일반 푸시인 경우 커밋 메시지를 가져옴
-          if [[ "${{ github.event.head_commit.message }}" == "Merge pull request"* ]]; then
-            PR_TITLE=$(echo "${{ github.event.head_commit.message }}" | grep -oP '(?<=Merge pull request #\d+ from \S+\s).*')
+          if [[ "${FIRST_LINE}" == "Merge pull request"* ]]; then
+            PR_TITLE=$(echo "${FIRST_LINE}" | grep -oP '(?<=Merge pull request #\d+ from \S+\s).*')
             echo "COMMIT_MSG=${PR_TITLE}" >> $GITHUB_ENV
           else
-            echo "COMMIT_MSG=${{ github.event.head_commit.message }}" >> $GITHUB_ENV
+            echo "COMMIT_MSG=${FIRST_LINE}" >> $GITHUB_ENV
           fi
 
       - name: Send Slack Notification
