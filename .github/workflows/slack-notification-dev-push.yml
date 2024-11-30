@@ -40,15 +40,17 @@ jobs:
           channel-id: ${{ secrets.SLACK_DEPLOY_CHANNEL_ID }}
           payload: |
             {
-              "text": "🔄 dev 브랜치가 업데이트 되었습니다",
               "blocks": [
                 {
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "🔄 dev 브랜치 업데이트 알림",
+                    "text": "✅ dev 브랜치 업데이트 알림",
                     "emoji": true
                   }
+                },
+                {
+                  "type": "divider"
                 },
                 {
                   "type": "section",
