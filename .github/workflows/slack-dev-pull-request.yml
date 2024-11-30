@@ -27,8 +27,8 @@ jobs:
           PR_BODY="${{ github.event.pull_request.body }}"
           
           # PR의 리뷰어 추출 및 Slack 멘션 형식으로 변환
-          REVIEWERS=$(echo "${{ toJson(github.event.pull_request.requested_reviewers) }}" | jq -r '.[].login' | while read -r username; do
-            slack_id=$(echo $SLACK_USER_MAPPING | jq -r ".[\"$username\"] // \"$username\"")
+          REVIEWERS=$(echo '${{ toJson(github.event.pull_request.requested_reviewers) }}' | jq -r '.[].login' | while read -r username; do
+            slack_id=$(jq -r --arg user "$username" '.[$user] // $user' <<< "$SLACK_USER_MAPPING")
             if [ "$slack_id" != "$username" ]; then
               echo "<@$slack_id>"
             else
