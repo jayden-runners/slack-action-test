@@ -18,11 +18,28 @@ jobs:
 
       - name: Get PR information
         id: get_pr_info
+        env:
+          SLACK_USER_MAPPING: ${{ secrets.SLACK_USER_ID_JSON }}
         run: |
           PR_NUMBER=${{ github.event.number }}
           PR_TITLE="${{ github.event.pull_request.title }}"
           PR_URL=${{ github.event.pull_request.html_url }}
           PR_BODY="${{ github.event.pull_request.body }}"
+          
+          # PR의 리뷰어 추출 및 Slack 멘션 형식으로 변환
+          REVIEWERS=$(echo "${{ toJson(github.event.pull_request.requested_reviewers) }}" | jq -r '.[].login' | while read -r username; do
+            slack_id=$(echo $SLACK_USER_MAPPING | jq -r ".[\"$username\"] // \"$username\"")
+            if [ "$slack_id" != "$username" ]; then
+              echo "<@$slack_id>"
+            else
+              echo "@$username"
+            fi
+          done | tr '\n' ' ' | sed 's/\s*$//')
+          
+          # 리뷰어가 없는 경우 처리
+          if [ -z "$REVIEWERS" ]; then
+            REVIEWERS="없음"
+          fi
           
           # PR 본문에서 @멘션 추출 (@ 유지)
           MENTIONED_USERS=$(echo "$PR_BODY" | grep -o '@[[:alnum:]-]*' | tr '\n' ' ' | sed 's/\s*$//')
@@ -35,6 +52,7 @@ jobs:
           echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
           echo "PR_TITLE=$PR_TITLE" >> $GITHUB_ENV
           echo "PR_URL=$PR_URL" >> $GITHUB_ENV
+          echo "PR_REVIEWERS=$REVIEWERS" >> $GITHUB_ENV
           echo "PR_MENTIONED_USERS=$MENTIONED_USERS" >> $GITHUB_ENV
 
       - name: Send Slack Notification
@@ -45,8 +63,18 @@ jobs:
           channel-id: ${{ secrets.SLACK_DEPLOY_CHANNEL_ID }}
           payload: |
             {
-              "text": "PR #${{ env.PR_NUMBER }} - \"${{ env.PR_TITLE }}\" 가 dev 브랜치에 제출되었습니다.",
               "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "🔄 PR 알림",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "divider"
+                },
                 {
                   "type": "section",
                   "text": {
