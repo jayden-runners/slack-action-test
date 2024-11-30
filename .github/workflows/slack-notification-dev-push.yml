@@ -17,14 +17,19 @@ jobs:
         id: set_push_info
         run: |
           echo "PUSH_AUTHOR=${{ github.actor }}" >> $GITHUB_ENV
-          echo "PR_URL=https://github.com/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.sha }}" >> $GITHUB_ENV
           
-          # PR 머지인 경우 PR 제목을, 일반 푸시인 경우 커밋 메시지를 가져옴
-          if [[ "${{ github.event.head_commit.message }}" == "Merge pull request"* ]]; then
-            PR_TITLE=$(echo "${{ github.event.head_commit.message }}" | grep -oP '(?<=Merge pull request #\d+ from \S+\s).*')
+          # 커밋 메시지에서 첫 번째 줄만 추출
+          FIRST_LINE=$(echo "${{ github.event.head_commit.message }}" | head -n 1)
+          
+          # PR 머지인 경우 PR 번호를 추출하여 PR 페이지로 이동
+          if [[ "${FIRST_LINE}" == "Merge pull request"* ]]; then
+            PR_NUMBER=$(echo "${FIRST_LINE}" | grep -oP '#\K\d+')
+            echo "CHANGE_URL=https://github.com/${{ github.repository }}/pull/${PR_NUMBER}" >> $GITHUB_ENV
+            PR_TITLE=$(echo "${FIRST_LINE}" | grep -oP '(?<=Merge pull request #\d+ from \S+\s).*')
             echo "COMMIT_MSG=${PR_TITLE}" >> $GITHUB_ENV
           else
-            echo "COMMIT_MSG=${{ github.event.head_commit.message }}" >> $GITHUB_ENV
+            echo "CHANGE_URL=https://github.com/${{ github.repository }}/commit/${{ github.sha }}" >> $GITHUB_ENV
+            echo "COMMIT_MSG=${FIRST_LINE}" >> $GITHUB_ENV
           fi
 
       - name: Send Slack Notification
@@ -49,7 +54,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*담당자:* 👩‍💻 ${{ env.PUSH_AUTHOR }}\n*커밋 메시지:* ${{ env.COMMIT_MSG }}\n\n dev 브랜치가 업데이트 되었습니다. 작업 전 반드시 merge/pull 해주세요!"
+                    "text": "*담당자:* 👩‍💻 ${{ env.PUSH_AUTHOR }}\n*제목:* ${{ env.COMMIT_MSG }}\n\n dev 브랜치가 업데이트 되었습니다. 작업 전 반드시 pull/merge 해주세요!"
                   }
                 },
                 {
@@ -63,7 +68,7 @@ jobs:
                         "text": "🔍 변경사항 보기"
                       },
                       "style": "primary",
-                      "url": "${{ env.PR_URL }}",
+                      "url": "${{ env.CHANGE_URL }}"
                       "value": "view_pr"
                     }
                   ]
